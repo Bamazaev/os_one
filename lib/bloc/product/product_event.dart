@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import '../../models/product_model.dart';
 
 abstract class ProductEvent extends Equatable {
   const ProductEvent();
@@ -24,46 +25,12 @@ class ProductsLoadByCategory extends ProductEvent {
 
 // Add new product
 class ProductAddRequested extends ProductEvent {
-  final String barcode;
-  final int categoryId;
-  final String name;
-  final String? imageBase64;
-  final String? description;
-  final double stock;
-  final double purchasePrice;
-  final double salePrice;
-  final String? expireAt;
-  final double? piece;
-  final String? unit;
+  final ProductModel product;
 
-  const ProductAddRequested({
-    required this.barcode,
-    required this.categoryId,
-    required this.name,
-    this.imageBase64,
-    this.description,
-    required this.stock,
-    required this.purchasePrice,
-    required this.salePrice,
-    this.expireAt,
-    this.piece,
-    this.unit,
-  });
+  const ProductAddRequested(this.product);
 
   @override
-  List<Object?> get props => [
-        barcode,
-        categoryId,
-        name,
-        imageBase64,
-        description,
-        stock,
-        purchasePrice,
-        salePrice,
-        expireAt,
-        piece,
-        unit,
-      ];
+  List<Object?> get props => [product];
 }
 
 // Update product

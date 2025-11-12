@@ -77,50 +77,21 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
   ) async {
     try {
       emit(state.copyWith(isLoading: true));
-      print('📝 Илова кардани продукт: ${event.name}');
-
-      // Generate ID (timestamp)
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final id = timestamp % 100000000;
-
-      // Get next position
-      final maxPosition = state.products.isEmpty
-          ? 0
-          : state.products.map((p) => p.position).reduce((a, b) => a > b ? a : b);
-      final position = maxPosition + 1;
-
-      // Create new product
-      final newProduct = ProductModel(
-        id: id,
-        barcode: event.barcode,
-        categoryId: event.categoryId,
-        name: event.name,
-        imageBase64: event.imageBase64,
-        description: event.description,
-        stock: event.stock,
-        purchasePrice: event.purchasePrice,
-        salePrice: event.salePrice,
-        position: position,
-        expireAt: event.expireAt,
-        piece: event.piece,
-        unit: event.unit,
-      );
+      print('📝 Илова кардани продукт: ${event.product.name}');
 
       // Save to Google Sheets
-      final success = await productRepository.addProduct(newProduct);
+      final success = await productRepository.addProduct(event.product);
 
       if (success) {
         // Reload products
-        final updatedProducts = state.selectedCategoryId != null
-            ? await productRepository.getProductsByCategory(state.selectedCategoryId!)
-            : await productRepository.getAllProducts();
+        final updatedProducts = await productRepository.getAllProducts();
         
         emit(state.copyWith(
           products: updatedProducts,
           isLoading: false,
           error: null,
         ));
-        print('✅ Продукт "${event.name}" илова шуд');
+        print('✅ Продукт "${event.product.name}" илова шуд');
       } else {
         emit(state.copyWith(
           isLoading: false,

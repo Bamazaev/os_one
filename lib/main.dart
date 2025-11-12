@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'splash_screen.dart';
 import 'auth/bloc/auth_bloc.dart';
@@ -87,6 +88,17 @@ class MyApp extends StatelessWidget {
                 return MaterialApp(
               title: 'Касса OS',
               debugShowCheckedModeBanner: false,
+              // Локализатсия барои русӣ
+              localizationsDelegates: const [
+                GlobalMaterialLocalizations.delegate,
+                GlobalWidgetsLocalizations.delegate,
+                GlobalCupertinoLocalizations.delegate,
+              ],
+              supportedLocales: const [
+                Locale('ru', 'RU'), // Русский
+                Locale('en', 'US'), // English
+              ],
+              locale: const Locale('ru', 'RU'), // Default русский
               theme: ThemeData(
                 colorScheme: ColorScheme.fromSeed(
                   seedColor: const Color(0xFF10b981),
