@@ -1018,344 +1018,305 @@ class _HomePageState extends State<HomePage> {
       DateTime.tryParse(product.expireAt!) != null &&
       DateTime.parse(product.expireAt!).isBefore(DateTime.now());
     
-    final bool isLowStock = product.stock < 10;
-    
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            themeState.cardColor,
-            themeState.surfaceColor,
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(25),
+      child: Container(
+        decoration: BoxDecoration(
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.15),
+              blurRadius: 20,
+              offset: const Offset(0, 8),
+            ),
           ],
         ),
-        boxShadow: [
-          BoxShadow(
-            color: themeState.primaryColor.withOpacity(0.1),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(18),
-          onTap: () {
-            // TODO: Open product detail
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Просмотр: ${product.name}'),
-                backgroundColor: themeState.primaryColor,
-                duration: const Duration(milliseconds: 800),
-              ),
-            );
-          },
-          onLongPress: () {
-            // TODO: Show edit/delete options
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Редактировать: ${product.name}'),
-                backgroundColor: Colors.blue,
-                duration: const Duration(milliseconds: 800),
-              ),
-            );
-          },
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Product image with overlay gradient
-              Expanded(
-                flex: 3,
-                child: Stack(
-                  children: [
-                    // Image
-                    RepaintBoundary(
-                      child: ClipRRect(
-                        borderRadius: const BorderRadius.vertical(top: Radius.circular(18)),
-                        child: Container(
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Просмотр: ${product.name}'),
+                  backgroundColor: themeState.primaryColor,
+                  duration: const Duration(milliseconds: 800),
+                ),
+              );
+            },
+            onLongPress: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Редактировать: ${product.name}'),
+                  backgroundColor: Colors.blue,
+                  duration: const Duration(milliseconds: 800),
+                ),
+              );
+            },
+            child: Stack(
+              children: [
+                // Full-screen product image
+                RepaintBoundary(
+                  child: product.imageBase64 != null && product.imageBase64!.isNotEmpty
+                      ? Image.memory(
+                          base64Decode(product.imageBase64!),
                           width: double.infinity,
                           height: double.infinity,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                Colors.transparent,
-                                Colors.black.withOpacity(0.05),
-                              ],
+                          fit: BoxFit.cover,
+                          gaplessPlayback: true,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              color: Colors.grey[300],
+                              child: const Center(
+                                child: Icon(
+                                  Icons.shopping_bag_outlined,
+                                  size: 60,
+                                  color: Colors.grey,
+                                ),
+                              ),
+                            );
+                          },
+                        )
+                      : Container(
+                          color: Colors.grey[300],
+                          child: const Center(
+                            child: Icon(
+                              Icons.shopping_bag_outlined,
+                              size: 60,
+                              color: Colors.grey,
                             ),
                           ),
-                          child: product.imageBase64 != null && product.imageBase64!.isNotEmpty
-                              ? Image.memory(
-                                  base64Decode(product.imageBase64!),
-                                  width: double.infinity,
-                                  height: double.infinity,
-                                  fit: BoxFit.cover,
-                                  gaplessPlayback: true,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Center(
-                                      child: Icon(
-                                        Icons.shopping_bag_outlined,
-                                        size: 50,
-                                        color: themeState.secondaryTextColor,
-                                      ),
-                                    );
-                                  },
-                                )
-                              : Center(
-                                  child: Icon(
-                                    Icons.shopping_bag_outlined,
-                                    size: 50,
-                                    color: themeState.secondaryTextColor,
-                                  ),
-                                ),
                         ),
-                      ),
-                    ),
-                    
-                    // Top badges row
-                    Positioned(
-                      top: 8,
-                      left: 8,
-                      right: 8,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          // Favorite badge
-                          if (product.isFavorite)
-                            Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: Colors.red.withOpacity(0.9),
-                                borderRadius: BorderRadius.circular(10),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: Colors.red.withOpacity(0.4),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: const Icon(
-                                Icons.favorite,
-                                color: Colors.white,
-                                size: 16,
-                              ),
-                            )
-                          else
-                            const SizedBox(),
-                          
-                          // Stock badge
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                            decoration: BoxDecoration(
-                              color: product.stock > 0 
-                                  ? isLowStock
-                                      ? Colors.orange.withOpacity(0.95)
-                                      : themeState.primaryColor.withOpacity(0.95)
-                                  : Colors.red.withOpacity(0.95),
-                              borderRadius: BorderRadius.circular(12),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: (product.stock > 0 
-                                      ? isLowStock 
-                                          ? Colors.orange 
-                                          : themeState.primaryColor
-                                      : Colors.red).withOpacity(0.4),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 2),
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  isLowStock 
-                                      ? Icons.warning_rounded 
-                                      : Icons.inventory_2,
-                                  color: Colors.white,
-                                  size: 14,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  '${product.stock.toStringAsFixed(0)}',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+                ),
+                
+                // Dark gradient overlay at bottom for text readability
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Container(
+                    height: 180,
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withOpacity(0.5),
+                          Colors.black.withOpacity(0.85),
                         ],
                       ),
                     ),
-                    
-                    // Expire date warning (bottom badge)
-                    if (isExpired)
-                      Positioned(
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(vertical: 6),
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                Colors.red.withOpacity(0.9),
-                                Colors.deepOrange.withOpacity(0.9),
-                              ],
-                            ),
-                            borderRadius: const BorderRadius.only(
-                              bottomLeft: Radius.circular(0),
-                              bottomRight: Radius.circular(0),
-                            ),
+                  ),
+                ),
+                
+                // Info icon (top left)
+                Positioned(
+                  top: 12,
+                  left: 12,
+                  child: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.4),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.info_outline,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                ),
+                
+                // Price badge (top right)
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.75),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          '${product.salePrice.toStringAsFixed(2)}',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                            height: 1,
                           ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          product.unit ?? 'сомонӣ',
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.9),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                
+                // Bottom content
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Stock and sold badges (center)
+                        Center(
                           child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: const [
-                              Icon(
-                                Icons.event_busy,
-                                color: Colors.white,
-                                size: 14,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              // Stock badge (green)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: themeState.primaryColor,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  '${product.stock.toStringAsFixed(0)}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
                               ),
-                              SizedBox(width: 4),
-                              Text(
-                                'Истек срок',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
+                              const SizedBox(width: 12),
+                              
+                              // Stock sold badge (red)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: Colors.red,
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  '${product.stockSold.toStringAsFixed(0)}',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              
+                              // Unit badge (dark)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.6),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  (product.unit != null && product.unit!.isNotEmpty) 
+                                      ? product.unit! 
+                                      : 'КГ',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
                                 ),
                               ),
                             ],
                           ),
                         ),
-                      ),
-                  ],
-                ),
-              ),
-              
-              // Product info section with gradient background
-              Expanded(
-                flex: 2,
-                child: Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        themeState.cardColor,
-                        themeState.surfaceColor.withOpacity(0.5),
-                      ],
-                    ),
-                    borderRadius: const BorderRadius.vertical(
-                      bottom: Radius.circular(18),
-                    ),
-                  ),
-                  padding: const EdgeInsets.all(12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Product name
-                      RepaintBoundary(
-                        child: Text(
+                        const SizedBox(height: 16),
+                        
+                        // Product name (large, bold)
+                        Text(
                           product.name,
-                          style: TextStyle(
-                            color: themeState.textColor,
-                            fontSize: 14,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
                             fontWeight: FontWeight.bold,
-                            height: 1.3,
+                            height: 1.2,
+                            shadows: [
+                              Shadow(
+                                color: Colors.black,
+                                blurRadius: 4,
+                                offset: Offset(0, 2),
+                              ),
+                            ],
                           ),
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                      const Spacer(),
-                      
-                      // Price and unit row
-                      Row(
-                        children: [
-                          // Sale price with gradient
-                          Expanded(
-                            child: ShaderMask(
-                              shaderCallback: (bounds) => LinearGradient(
-                                colors: [
-                                  themeState.primaryColor,
-                                  themeState.primaryColor.withOpacity(0.7),
-                                ],
-                              ).createShader(bounds),
-                              child: Text(
-                                '${product.salePrice.toStringAsFixed(2)} с',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
+                        
+                        // Product description (small, light)
+                        if (product.description != null && product.description!.isNotEmpty) ...[
+                          const SizedBox(height: 6),
+                          Text(
+                            product.description!,
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.85),
+                              fontSize: 13,
+                              fontWeight: FontWeight.w400,
+                              height: 1.3,
                             ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          
-                          // Unit badge
-                          if (product.unit != null && product.unit!.isNotEmpty)
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: themeState.primaryColor.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: themeState.primaryColor.withOpacity(0.3),
-                                  width: 1,
-                                ),
-                              ),
-                              child: Text(
-                                product.unit!,
-                                style: TextStyle(
-                                  color: themeState.primaryColor,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
                         ],
-                      ),
-                      
-                      // Barcode hint (if exists)
-                      if (product.barcode.isNotEmpty) ...[
-                        const SizedBox(height: 6),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.qr_code_2,
-                              size: 12,
-                              color: themeState.secondaryTextColor,
-                            ),
-                            const SizedBox(width: 4),
-                            Expanded(
-                              child: Text(
-                                product.barcode,
-                                style: TextStyle(
-                                  color: themeState.secondaryTextColor,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ],
-                        ),
                       ],
-                    ],
+                    ),
                   ),
                 ),
-              ),
-            ],
+                
+                // Expired warning banner (if applicable)
+                if (isExpired)
+                  Positioned(
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.red.withOpacity(0.95),
+                            Colors.deepOrange.withOpacity(0.95),
+                          ],
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: const [
+                          Icon(
+                            Icons.event_busy,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                          SizedBox(width: 6),
+                          Text(
+                            'ИСТЕК СРОК',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
