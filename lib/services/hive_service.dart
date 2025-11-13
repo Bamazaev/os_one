@@ -10,11 +10,13 @@ class HiveService {
   static const String _settingsBoxName = 'settings';
   static const String _categoryBoxName = 'categories';
   static const String _productBoxName = 'products';
+  static const String _pendingOpsBoxName = 'pending_operations';
   
   static Box<UserModel>? _userBox;
   static Box? _settingsBox;
   static Box? _categoryBox;
   static Box? _productBox;
+  static Box? _pendingOpsBox;
 
   /// Инициализатсияи Hive
   static Future<void> init() async {
@@ -45,10 +47,12 @@ class HiveService {
       _settingsBox = await Hive.openBox(_settingsBoxName);
       _categoryBox = await Hive.openBox(_categoryBoxName);
       _productBox = await Hive.openBox(_productBoxName);
+      _pendingOpsBox = await Hive.openBox(_pendingOpsBoxName);
       print('✅ Hive boxes кушода шуданд');
       print('📦 Users box дорад ${_userBox!.length} корбар');
       print('📦 Categories box дорад ${_categoryBox!.length} категория');
       print('📦 Products box дорад ${_productBox!.length} продукт');
+      print('📦 Pending operations: ${_pendingOpsBox!.length}');
       print('⚙️ Settings: ${_settingsBox!.keys.toList()}');
     } catch (e) {
       print('❌ Хатогӣ дар Hive.init: $e');
@@ -331,6 +335,58 @@ class HiveService {
     final box = _productBox ?? Hive.box(_productBoxName);
     await box.clear();
     print('🗑️ Products cache пок шуд');
+  }
+
+  /// Пок кардани categories cache
+  static Future<void> clearCategoriesCache() async {
+    final box = _categoryBox ?? Hive.box(_categoryBoxName);
+    await box.clear();
+    print('🗑️ Categories cache пок шуд');
+  }
+
+  // ==================== PENDING OPERATIONS (OFFLINE QUEUE) ====================
+
+  /// Сохранить операцию в очередь офлайн операций
+  static Future<void> addPendingOperation(String type, Map<String, dynamic> data) async {
+    final box = _pendingOpsBox ?? Hive.box(_pendingOpsBoxName);
+    final operation = {
+      'type': type, // 'add_category', 'update_category', 'delete_category', 'add_product', 'update_product', 'delete_product'
+      'data': data,
+      'timestamp': DateTime.now().millisecondsSinceEpoch,
+    };
+    await box.add(operation);
+    print('📝 Операция добавлена в очередь: $type');
+  }
+
+  /// Получить все операции из очереди
+  static Future<List<Map<String, dynamic>>> getPendingOperations() async {
+    final box = _pendingOpsBox ?? Hive.box(_pendingOpsBoxName);
+    final operations = <Map<String, dynamic>>[];
+    for (var key in box.keys) {
+      final operation = box.get(key);
+      if (operation is Map) {
+        operations.add(Map<String, dynamic>.from(operation));
+      }
+    }
+    // Sort by timestamp
+    operations.sort((a, b) => (a['timestamp'] as int).compareTo(b['timestamp'] as int));
+    return operations;
+  }
+
+  /// Удалить операцию из очереди по индексу
+  static Future<void> removePendingOperationByIndex(int index) async {
+    final box = _pendingOpsBox ?? Hive.box(_pendingOpsBoxName);
+    final keys = box.keys.toList();
+    if (index >= 0 && index < keys.length) {
+      await box.delete(keys[index]);
+    }
+  }
+
+  /// Очистить очередь операций
+  static Future<void> clearPendingOperations() async {
+    final box = _pendingOpsBox ?? Hive.box(_pendingOpsBoxName);
+    await box.clear();
+    print('🗑️ Pending operations queue пок шуд');
   }
 }
 

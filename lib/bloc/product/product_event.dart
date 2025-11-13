@@ -10,7 +10,12 @@ abstract class ProductEvent extends Equatable {
 
 // Load all products
 class ProductsLoadRequested extends ProductEvent {
-  const ProductsLoadRequested();
+  final bool forceRefresh; // Force refresh from Google Sheets (skip cache)
+  
+  const ProductsLoadRequested({this.forceRefresh = false});
+  
+  @override
+  List<Object?> get props => [forceRefresh];
 }
 
 // Load products by category
@@ -103,5 +108,15 @@ class ProductFilterByExpireDate extends ProductEvent {
 
   @override
   List<Object?> get props => [showExpired];
+}
+
+// Search products
+class ProductSearchRequested extends ProductEvent {
+  final String query;
+
+  const ProductSearchRequested(this.query);
+
+  @override
+  List<Object?> get props => [query];
 }
 

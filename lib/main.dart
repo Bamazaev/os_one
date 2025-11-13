@@ -72,9 +72,13 @@ class MyApp extends StatelessWidget {
         ),
         // Category BLoC - барои категорияҳо
         BlocProvider(
-          create: (context) => CategoryBloc(
-            categoryRepository: CategoryRepository(),
-          )..add(const CategoriesLoadRequested()), // Загрузкаи категорияҳо
+          create: (context) {
+            final productRepo = ProductRepository();
+            return CategoryBloc(
+              categoryRepository: CategoryRepository(),
+              productRepository: productRepo,
+            )..add(const CategoriesLoadRequested()); // Загрузкаи категорияҳо
+          },
         ),
         // Product BLoC - барои продуктҳо
         BlocProvider(

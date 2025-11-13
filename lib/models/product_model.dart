@@ -37,22 +37,49 @@ class ProductModel extends Equatable {
 
   // From Map (Google Sheets)
   factory ProductModel.fromMap(Map<String, dynamic> map) {
+    // Find categoryId field (case-insensitive)
+    int categoryId = 0;
+    for (var key in map.keys) {
+      if (key.toLowerCase() == 'categoryid' || key.toLowerCase() == 'category_id') {
+        final value = map[key];
+        if (value != null) {
+          categoryId = int.tryParse(value.toString().trim()) ?? 0;
+        }
+        break;
+      }
+    }
+    // Fallback to direct access if not found
+    if (categoryId == 0) {
+      final catValue = map['categoryid'] ?? map['categoryId'];
+      if (catValue != null) {
+        categoryId = int.tryParse(catValue.toString().trim()) ?? 0;
+      }
+    }
+    
+    // Parse ID - handle large numbers by taking modulo if needed
+    final idValue = map['id']?.toString().trim() ?? '0';
+    int productId = int.tryParse(idValue) ?? 0;
+    // If ID is too large, use modulo to keep it in safe range
+    if (productId > 2147483647) {
+      productId = productId % 2147483647;
+    }
+    
     return ProductModel(
-      id: int.tryParse(map['id']?.toString() ?? '0') ?? 0,
-      barcode: map['barcode']?.toString() ?? '',
-      categoryId: int.tryParse(map['categoryid']?.toString() ?? '0') ?? 0,
-      name: map['name']?.toString() ?? '',
+      id: productId,
+      barcode: (map['barcode']?.toString() ?? '').trim(),
+      categoryId: categoryId,
+      name: (map['name']?.toString() ?? '').trim(),
       imageBase64: map['image']?.toString(),
-      description: map['description']?.toString(),
+      description: map['description']?.toString() != null ? map['description'].toString().trim() : null,
       stock: double.tryParse(map['stock']?.toString() ?? '0') ?? 0,
       stockSold: double.tryParse(map['stock_furuhtashud']?.toString() ?? '0') ?? 0,
       purchasePrice: double.tryParse(map['narhiOmadagish']?.toString() ?? '0') ?? 0,
       salePrice: double.tryParse(map['narhifurush']?.toString() ?? '0') ?? 0,
-      isFavorite: map['isFavorite']?.toString().toLowerCase() == 'true',
+      isFavorite: (map['isFavorite']?.toString() ?? '').toLowerCase().trim() == 'true',
       position: int.tryParse(map['position']?.toString() ?? '0') ?? 0,
-      expireAt: map['expireAt']?.toString(),
+      expireAt: map['expireAt']?.toString() != null ? map['expireAt'].toString().trim() : null,
       piece: double.tryParse(map['piece']?.toString() ?? ''),
-      unit: map['unit']?.toString(),
+      unit: map['unit']?.toString() != null ? map['unit'].toString().trim() : null,
     );
   }
 

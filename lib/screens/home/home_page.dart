@@ -17,8 +17,9 @@ import '../../bloc/category/category_state.dart';
 import '../../models/category_model.dart';
 import '../../bloc/product/product_bloc.dart';
 import '../../bloc/product/product_event.dart';
-import '../../bloc/product/product_state.dart';
 import '../../models/product_model.dart';
+import 'widgets/categories_section.dart';
+import 'widgets/products_section.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -29,6 +30,7 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   int? _selectedCategoryForEdit; // ID of category being edited/deleted
+  int? _selectedProductForEdit; // ID of product being edited/deleted
 
   Widget _buildCategoryCard({
     required CategoryModel category,
@@ -110,7 +112,7 @@ class _HomePageState extends State<HomePage> {
               ),
             ),
             
-            // Green overlay (only when selected) - animated
+            // Green overlay (only when selected) - animated and more visible
             AnimatedOpacity(
               duration: const Duration(milliseconds: 300),
               curve: Curves.easeInOut,
@@ -122,9 +124,10 @@ class _HomePageState extends State<HomePage> {
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Colors.transparent,
-                      themeState.primaryColor.withOpacity(0.85),
+                      themeState.primaryColor.withOpacity(0.3),
+                      themeState.primaryColor.withOpacity(0.95),
                     ],
+                    stops: const [0.0, 0.5],
                   ),
                 ),
               ),
@@ -1555,7 +1558,11 @@ class _HomePageState extends State<HomePage> {
                           ),
                           child: DropdownButtonHideUnderline(
                             child: DropdownButton<int>(
-                              value: selectedCategoryId,
+                              value: selectedCategoryId != null && 
+                                     selectedCategoryId! > 0 && 
+                                     categoryState.categories.any((c) => c.id == selectedCategoryId)
+                                  ? selectedCategoryId
+                                  : null, // Set to null if category doesn't exist or is invalid
                               isExpanded: true,
                               hint: Text(
                                 'Выберите категорию',
@@ -1653,7 +1660,9 @@ class _HomePageState extends State<HomePage> {
                                 ),
                                 child: DropdownButtonHideUnderline(
                                   child: DropdownButton<String>(
-                                    value: selectedUnit,
+                                    value: selectedUnit != null && unitOptions.any((u) => u['value'] == selectedUnit)
+                                        ? selectedUnit
+                                        : null, // Set to null if value doesn't exist in items
                                     isExpanded: true,
                                     hint: Text(
                                       'Выберите',
@@ -1662,8 +1671,9 @@ class _HomePageState extends State<HomePage> {
                                     dropdownColor: themeState.surfaceColor,
                                     style: TextStyle(color: themeState.textColor),
                                     items: unitOptions.map((unit) {
+                                      final value = unit['value']!;
                                       return DropdownMenuItem<String>(
-                                        value: unit['value'],
+                                        value: value,
                                         child: Text(unit['label']!),
                                       );
                                     }).toList(),
@@ -1685,11 +1695,18 @@ class _HomePageState extends State<HomePage> {
                     // Expire date picker
                     GestureDetector(
                       onTap: () async {
+                        final now = DateTime.now();
+                        final firstDate = now;
+                        // Use now as initialDate (for new products, selectedExpireDate is null)
+                        final initialDate = selectedExpireDate != null && selectedExpireDate!.isAfter(now)
+                            ? selectedExpireDate!
+                            : now;
+                        
                         final date = await showDatePicker(
                           context: context,
-                          initialDate: DateTime.now(),
-                          firstDate: DateTime.now(),
-                          lastDate: DateTime.now().add(const Duration(days: 3650)),
+                          initialDate: initialDate,
+                          firstDate: firstDate,
+                          lastDate: now.add(const Duration(days: 3650)),
                           builder: (context, child) {
                             return Theme(
                               data: ThemeData.light().copyWith(
@@ -1829,7 +1846,7 @@ class _HomePageState extends State<HomePage> {
                   // Close dialog first
                   Navigator.pop(dialogContext);
 
-                  // Show loading indicator
+                  // Show loading SnackBar with indicator
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Row(
@@ -1843,44 +1860,19 @@ class _HomePageState extends State<HomePage> {
                             ),
                           ),
                           const SizedBox(width: 16),
-                          Text('Сохранение "${product.name}"...'),
+                          Expanded(
+                            child: Text('Сохранение "${product.name}"...'),
+                          ),
                         ],
                       ),
-                      backgroundColor: themeState.primaryColor.withOpacity(0.8),
-                      duration: const Duration(seconds: 1),
+                      backgroundColor: themeState.primaryColor.withOpacity(0.9),
+                      duration: const Duration(seconds: 30), // Long duration, will be closed by listener
+                      behavior: SnackBarBehavior.floating,
                     ),
                   );
 
                   // Dispatch event
                   context.read<ProductBloc>().add(ProductAddRequested(product));
-
-                  // Wait for the product to be added and show success message
-                  Future.delayed(const Duration(milliseconds: 1500), () {
-                    if (context.mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Row(
-                            children: [
-                              const Icon(Icons.check_circle, color: Colors.white, size: 24),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  '✅ Продукт "${product.name}" илова шуд!',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          backgroundColor: themeState.primaryColor,
-                          duration: const Duration(seconds: 2),
-                          behavior: SnackBarBehavior.floating,
-                        ),
-                      );
-                    }
-                  });
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: themeState.primaryColor,
@@ -1901,6 +1893,625 @@ class _HomePageState extends State<HomePage> {
             ],
           );
         },
+      ),
+    );
+  }
+
+  // Edit product dialog
+  Future<void> _showEditProductDialog(BuildContext context, ThemeState themeState, ProductModel product) async {
+    final nameController = TextEditingController(text: product.name);
+    final barcodeController = TextEditingController(text: product.barcode);
+    final descriptionController = TextEditingController(text: product.description ?? '');
+    final stockController = TextEditingController(text: product.stock.toString());
+    final purchasePriceController = TextEditingController(text: product.purchasePrice.toString());
+    final salePriceController = TextEditingController(text: product.salePrice.toString());
+    
+    String? selectedImageBase64 = product.imageBase64;
+    Uint8List? selectedImageBytes = product.imageBase64 != null 
+        ? base64Decode(product.imageBase64!) 
+        : null;
+    int? selectedCategoryId = product.categoryId;
+    DateTime? selectedExpireDate = product.expireAt != null 
+        ? DateTime.tryParse(product.expireAt!) 
+        : null;
+    // Unit options
+    final List<Map<String, String>> unitOptions = [
+      {'value': 'КГ', 'label': 'КГ (килограмм)'},
+      {'value': 'Л', 'label': 'Л (литр)'},
+      {'value': 'М', 'label': 'М (метр)'},
+      {'value': 'ШТ', 'label': 'ШТ (штука)'},
+    ];
+    
+    // Normalize unit value - check if it exists in options, otherwise set to null
+    String? selectedUnit = product.unit;
+    if (selectedUnit != null && selectedUnit.isNotEmpty) {
+      final validUnits = unitOptions.map((u) => u['value']!).whereType<String>().toList();
+      // Check if value exists in valid units (case-insensitive)
+      final existsInValid = validUnits.any((u) => u.toLowerCase() == selectedUnit!.toLowerCase());
+      
+      if (!existsInValid) {
+        // Try to normalize common variations (case-insensitive)
+        final normalized = selectedUnit.trim().toUpperCase();
+        if (normalized == 'KG' || normalized == 'КГ' || normalized == 'КИЛОГРАММ') {
+          selectedUnit = 'КГ';
+        } else if (normalized == 'L' || normalized == 'Л' || normalized == 'ЛИТР' || normalized == 'LITRE' || normalized == 'LITER') {
+          selectedUnit = 'Л';
+        } else if (normalized == 'M' || normalized == 'М' || normalized == 'МЕТР' || normalized == 'METER' || normalized == 'METRE') {
+          selectedUnit = 'М';
+        } else if (normalized == 'PCS' || normalized == 'PCE' || normalized == 'ШТ' || normalized == 'ШТУКА' || normalized == 'PIECE' || normalized == 'PCS.') {
+          selectedUnit = 'ШТ';
+        } else {
+          // If not found, set to null to avoid DropdownButton error
+          selectedUnit = null;
+        }
+      } else {
+        // Value exists but might be in different case - use the correct one from validUnits
+        selectedUnit = validUnits.firstWhere(
+          (u) => u.toLowerCase() == selectedUnit!.toLowerCase(),
+          orElse: () => 'КГ', // Default fallback
+        );
+      }
+    }
+    
+    bool isFavorite = product.isFavorite;
+
+    await showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            backgroundColor: themeState.cardColor,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20),
+            ),
+            title: Text(
+              'Изменить продукт',
+              style: TextStyle(
+                color: themeState.textColor,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            content: SingleChildScrollView(
+              child: SizedBox(
+                width: 500,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Image picker - FIRST
+                    Center(
+                      child: GestureDetector(
+                        onTap: () async {
+                          final result = await _pickProductImage();
+                          if (result != null) {
+                            setState(() {
+                              selectedImageBase64 = result['base64'];
+                              selectedImageBytes = result['bytes'];
+                            });
+                          }
+                        },
+                        child: selectedImageBytes != null
+                            ? ClipRRect(
+                                borderRadius: BorderRadius.circular(15),
+                                child: Image.memory(
+                                  selectedImageBytes!,
+                                  width: 180,
+                                  height: 180,
+                                  fit: BoxFit.cover,
+                                ),
+                              )
+                            : Container(
+                                width: 180,
+                                height: 180,
+                                decoration: BoxDecoration(
+                                  color: themeState.surfaceColor,
+                                  borderRadius: BorderRadius.circular(15),
+                                  border: Border.all(
+                                    color: themeState.primaryColor.withOpacity(0.5),
+                                    width: 2,
+                                    style: BorderStyle.solid,
+                                  ),
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.add_photo_alternate,
+                                      size: 50,
+                                      color: themeState.primaryColor,
+                                    ),
+                                    const SizedBox(height: 12),
+                                    Text(
+                                      'Выбрать фото',
+                                      style: TextStyle(
+                                        color: themeState.primaryColor,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                      ),
+                    ),
+                    const SizedBox(height: 25),
+
+                    // Name field
+                    _buildTextField(
+                      controller: nameController,
+                      label: 'Название *',
+                      hint: 'Введите название продукта',
+                      themeState: themeState,
+                    ),
+                    const SizedBox(height: 15),
+
+                    // Barcode field
+                    _buildTextField(
+                      controller: barcodeController,
+                      label: 'Баркод',
+                      hint: 'Введите баркод',
+                      themeState: themeState,
+                      keyboardType: TextInputType.number,
+                    ),
+                    const SizedBox(height: 15),
+
+                    // Category dropdown
+                    Text(
+                      'Категория *',
+                      style: TextStyle(
+                        color: themeState.textColor,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    BlocBuilder<CategoryBloc, CategoryState>(
+                      builder: (context, categoryState) {
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          decoration: BoxDecoration(
+                            color: themeState.surfaceColor,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: themeState.borderColor),
+                          ),
+                          child: DropdownButtonHideUnderline(
+                            child: DropdownButton<int>(
+                              value: selectedCategoryId != null && 
+                                     selectedCategoryId! > 0 && 
+                                     categoryState.categories.any((c) => c.id == selectedCategoryId)
+                                  ? selectedCategoryId
+                                  : null, // Set to null if category doesn't exist or is invalid
+                              isExpanded: true,
+                              hint: Text(
+                                'Выберите категорию',
+                                style: TextStyle(color: themeState.secondaryTextColor),
+                              ),
+                              dropdownColor: themeState.surfaceColor,
+                              style: TextStyle(color: themeState.textColor),
+                              items: categoryState.categories.map((category) {
+                                return DropdownMenuItem<int>(
+                                  value: category.id,
+                                  child: Text(category.name),
+                                );
+                              }).toList(),
+                              onChanged: (value) {
+                                setState(() {
+                                  selectedCategoryId = value;
+                                });
+                              },
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                    const SizedBox(height: 15),
+
+                    // Description field
+                    _buildTextField(
+                      controller: descriptionController,
+                      label: 'Описание',
+                      hint: 'Введите описание',
+                      themeState: themeState,
+                      maxLines: 3,
+                    ),
+                    const SizedBox(height: 15),
+
+                    // Sale price and stock row
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildTextField(
+                            controller: salePriceController,
+                            label: 'Цена продажи *',
+                            hint: '0.00',
+                            themeState: themeState,
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: _buildTextField(
+                            controller: stockController,
+                            label: 'Склад *',
+                            hint: '0',
+                            themeState: themeState,
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 15),
+
+                    // Purchase price and unit row
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildTextField(
+                            controller: purchasePriceController,
+                            label: 'Цена покупки *',
+                            hint: '0.00',
+                            themeState: themeState,
+                            keyboardType: TextInputType.number,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        // Unit dropdown
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Единица',
+                                style: TextStyle(
+                                  color: themeState.textColor,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                decoration: BoxDecoration(
+                                  color: themeState.surfaceColor,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: themeState.borderColor),
+                                ),
+                                child: DropdownButtonHideUnderline(
+                                  child: DropdownButton<String>(
+                                    value: selectedUnit != null && unitOptions.any((u) => u['value'] == selectedUnit)
+                                        ? selectedUnit
+                                        : null, // Set to null if value doesn't exist in items
+                                    isExpanded: true,
+                                    hint: Text(
+                                      'Выберите',
+                                      style: TextStyle(color: themeState.secondaryTextColor),
+                                    ),
+                                    dropdownColor: themeState.surfaceColor,
+                                    style: TextStyle(color: themeState.textColor),
+                                    items: unitOptions.map((unit) {
+                                      final value = unit['value']!;
+                                      return DropdownMenuItem<String>(
+                                        value: value,
+                                        child: Text(unit['label']!),
+                                      );
+                                    }).toList(),
+                                    onChanged: (value) {
+                                      setState(() {
+                                        selectedUnit = value;
+                                      });
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 15),
+
+                    // Expire date picker
+                    GestureDetector(
+                      onTap: () async {
+                        final now = DateTime.now();
+                        final firstDate = now;
+                        // If selectedExpireDate is in the past, use now as initialDate
+                        final initialDate = selectedExpireDate != null && selectedExpireDate!.isAfter(now)
+                            ? selectedExpireDate!
+                            : now;
+                        
+                        final date = await showDatePicker(
+                          context: context,
+                          initialDate: initialDate,
+                          firstDate: firstDate,
+                          lastDate: now.add(const Duration(days: 3650)),
+                          builder: (context, child) {
+                            return Theme(
+                              data: ThemeData.light().copyWith(
+                                colorScheme: ColorScheme.light(
+                                  primary: themeState.primaryColor,
+                                ),
+                              ),
+                              child: child!,
+                            );
+                          },
+                        );
+                        if (date != null) {
+                          setState(() {
+                            selectedExpireDate = date;
+                          });
+                        }
+                      },
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                        decoration: BoxDecoration(
+                          color: themeState.surfaceColor,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: themeState.borderColor),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.calendar_today,
+                              color: themeState.primaryColor,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              selectedExpireDate != null
+                                  ? '${selectedExpireDate!.day}.${selectedExpireDate!.month}.${selectedExpireDate!.year}'
+                                  : 'Срок годности (опционально)',
+                              style: TextStyle(
+                                color: selectedExpireDate != null
+                                    ? themeState.textColor
+                                    : themeState.secondaryTextColor,
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 15),
+
+                    // Favorite checkbox
+                    Row(
+                      children: [
+                        Checkbox(
+                          value: isFavorite,
+                          activeColor: themeState.primaryColor,
+                          onChanged: (value) {
+                            setState(() {
+                              isFavorite = value ?? false;
+                            });
+                          },
+                        ),
+                        Text(
+                          'Избранное',
+                          style: TextStyle(
+                            color: themeState.textColor,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            actions: [
+              // Cancel button
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext),
+                child: Text(
+                  'Отмена',
+                  style: TextStyle(
+                    color: themeState.secondaryTextColor,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+              // Save button
+              ElevatedButton(
+                onPressed: () {
+                  // Validation
+                  if (nameController.text.trim().isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Введите название продукта'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    return;
+                  }
+
+                  if (selectedCategoryId == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Выберите категорию'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                    return;
+                  }
+
+                  Navigator.pop(dialogContext);
+
+                  // Show loading SnackBar with indicator
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Row(
+                        children: [
+                          const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: Text('Обновление "${nameController.text.trim()}"...'),
+                          ),
+                        ],
+                      ),
+                      backgroundColor: Colors.blue.withOpacity(0.9),
+                      duration: const Duration(seconds: 30), // Long duration, will be closed by listener
+                      behavior: SnackBarBehavior.floating,
+                    ),
+                  );
+
+                  // Dispatch update event
+                  context.read<ProductBloc>().add(
+                    ProductUpdateRequested(
+                      id: product.id,
+                      barcode: barcodeController.text.trim().isEmpty 
+                          ? '' 
+                          : barcodeController.text.trim(),
+                      categoryId: selectedCategoryId!,
+                      name: nameController.text.trim(),
+                      imageBase64: selectedImageBase64,
+                      description: descriptionController.text.trim().isNotEmpty
+                          ? descriptionController.text.trim()
+                          : null,
+                      stock: double.tryParse(stockController.text) ?? 0.0,
+                      purchasePrice: double.tryParse(purchasePriceController.text) ?? 0.0,
+                      salePrice: double.tryParse(salePriceController.text) ?? 0.0,
+                      expireAt: selectedExpireDate?.toIso8601String(),
+                      unit: selectedUnit,
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blue,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
+                child: const Text(
+                  'Сохранить',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  // Delete product dialog
+  Future<void> _showDeleteProductDialog(BuildContext context, ThemeState themeState, ProductModel product) async {
+    return showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: themeState.cardColor,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: Colors.red.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.delete_forever,
+                color: Colors.red,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              'Удалить продукт?',
+              style: TextStyle(
+                color: themeState.textColor,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Вы уверены, что хотите удалить продукт "${product.name}"?\n\nЭто действие нельзя отменить.',
+          style: TextStyle(
+            color: themeState.textColor,
+            fontSize: 16,
+          ),
+        ),
+        actions: [
+          // Cancel button
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: Text(
+              'Отмена',
+              style: TextStyle(
+                color: themeState.secondaryTextColor,
+                fontSize: 16,
+              ),
+            ),
+          ),
+          // Delete button
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              
+              // Show loading SnackBar with indicator
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Row(
+                    children: [
+                      const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Text('Удаление "${product.name}"...'),
+                      ),
+                    ],
+                  ),
+                  backgroundColor: Colors.red.withOpacity(0.9),
+                  duration: const Duration(seconds: 30), // Long duration, will be closed by listener
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+              
+              // Dispatch delete event
+              context.read<ProductBloc>().add(
+                ProductDeleteRequested(product.id),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            ),
+            child: const Text(
+              'Удалить',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -2211,6 +2822,11 @@ class _HomePageState extends State<HomePage> {
                                   border: InputBorder.none,
                                   contentPadding: const EdgeInsets.symmetric(vertical: 15),
                                 ),
+                                onChanged: (value) {
+                                  context.read<ProductBloc>().add(
+                                    ProductSearchRequested(value),
+                                  );
+                                },
                               ),
                             ),
                             // Barcode button inside
@@ -2246,260 +2862,36 @@ class _HomePageState extends State<HomePage> {
                       const SizedBox(height: 25),
                       
                       // Categories section
-                      BlocConsumer<CategoryBloc, CategoryState>(
-                        listener: (context, categoryState) {
-                          // Show error if any
-                          if (categoryState.error != null && categoryState.error!.isNotEmpty) {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(categoryState.error!),
-                                backgroundColor: Colors.red,
-                              ),
-                            );
-                          }
+                      CategoriesSection(
+                        themeState: themeState,
+                        isDesktop: isDesktop,
+                        selectedCategoryForEdit: _selectedCategoryForEdit,
+                        onEditModeChanged: (id) {
+                          setState(() {
+                            _selectedCategoryForEdit = id;
+                          });
                         },
-                        builder: (context, categoryState) {
-                          if (categoryState.isLoading && categoryState.categories.isEmpty) {
-                            return const Center(
-                              child: CircularProgressIndicator(),
-                            );
-                          }
-
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              // "Категории" title
-                              Text(
-                                'Категории',
-                                style: TextStyle(
-                                  color: themeState.textColor,
-                                  fontSize: isDesktop ? 24 : 20,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 15),
-                              
-                              // Horizontal scrolling categories
-                              SizedBox(
-                                height: isDesktop ? 140 : 120,
-                                child: ListView.builder(
-                                  scrollDirection: Axis.horizontal,
-                                  itemCount: categoryState.categories.length + 2, // +1 for "Все продукты", +1 for "Add button"
-                                  itemBuilder: (context, index) {
-                                    // First item - "Все продукты"
-                                    if (index == 0) {
-                                      final isSelected = categoryState.selectedCategoryId == null || categoryState.selectedCategoryId == 0;
-                                      return _buildAllProductsCard(
-                                        isSelected: isSelected,
-                                        themeState: themeState,
-                                        isDesktop: isDesktop,
-                                        onTap: () {
-                                          context.read<CategoryBloc>().add(
-                                            const CategorySelected(0), // 0 means all products
-                                          );
-                                        },
-                                      );
-                                    }
-                                    
-                                    // Last item - "Add category" button
-                                    if (index == categoryState.categories.length + 1) {
-                                      return _buildAddCategoryButton(
-                                        themeState: themeState,
-                                        isDesktop: isDesktop,
-                                        context: context,
-                                      );
-                                    }
-                                    
-                                    // Other categories
-                                    final category = categoryState.categories[index - 1];
-                                    final isSelected = categoryState.selectedCategoryId == category.id;
-                                    final showEditButtons = _selectedCategoryForEdit == category.id;
-                                    
-                                    return _buildCategoryCard(
-                                      category: category,
-                                      isSelected: isSelected,
-                                      themeState: themeState,
-                                      isDesktop: isDesktop,
-                                      showEditButtons: showEditButtons,
-                                      onTap: () {
-                                        if (_selectedCategoryForEdit == category.id) {
-                                          // If edit mode, cancel it
-                                          setState(() {
-                                            _selectedCategoryForEdit = null;
-                                          });
-                                        } else {
-                                          // Normal category selection
-                                          context.read<CategoryBloc>().add(
-                                            CategorySelected(category.id),
-                                          );
-                                        }
-                                      },
-                                      onLongPress: () {
-                                        // Toggle edit mode
-                                        setState(() {
-                                          if (_selectedCategoryForEdit == category.id) {
-                                            _selectedCategoryForEdit = null;
-                                          } else {
-                                            _selectedCategoryForEdit = category.id;
-                                          }
-                                        });
-                                      },
-                                      onEdit: () {
-                                        _showEditCategoryDialog(context, themeState, category);
-                                      },
-                                      onDelete: () {
-                                        _showDeleteConfirmDialog(context, themeState, category);
-                                      },
-                                    );
-                                  },
-                                ),
-                              ),
-                            ],
-                          );
-                        },
+                        onAddCategory: _showAddCategoryDialog,
+                        onEditCategory: _showEditCategoryDialog,
+                        onDeleteCategory: _showDeleteConfirmDialog,
                       ),
                       
                       const SizedBox(height: 20),
                       
                       // Products area
                       Expanded(
-                        child: BlocConsumer<ProductBloc, ProductState>(
-                          listener: (context, productState) {
-                            // Show success message when product is added
-                            if (productState.products.isNotEmpty && !productState.isLoading && productState.error == null) {
-                              // Product added successfully - show green snackbar
-                              // (only if we're not initially loading)
-                            }
-                            
-                            // Show error if any
-                            if (productState.error != null && productState.error!.isNotEmpty) {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Row(
-                                    children: [
-                                      const Icon(Icons.error_outline, color: Colors.white),
-                                      const SizedBox(width: 12),
-                                      Expanded(
-                                        child: Text(
-                                          productState.error!,
-                                          style: const TextStyle(color: Colors.white),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  backgroundColor: Colors.red,
-                                  duration: const Duration(seconds: 3),
-                                ),
-                              );
-                            }
+                        child: ProductsSection(
+                          themeState: themeState,
+                          isDesktop: isDesktop,
+                          selectedProductForEdit: _selectedProductForEdit,
+                          onEditModeChanged: (id) {
+                            setState(() {
+                              _selectedProductForEdit = id;
+                            });
                           },
-                          builder: (context, productState) {
-                            return Column(
-                              children: [
-                                // Products header with buttons
-                                Row(
-                                  children: [
-                                    Text(
-                                      'Продукты',
-                                      style: TextStyle(
-                                        color: themeState.textColor,
-                                        fontSize: isDesktop ? 24 : 20,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    const Spacer(),
-                                    // Add product button
-                                    IconButton(
-                                      onPressed: () => _showAddProductDialog(context, themeState),
-                                      icon: Icon(Icons.add_circle, color: themeState.primaryColor),
-                                      tooltip: 'Добавить продукт',
-                                    ),
-                                    // Filter by expire date
-                                    IconButton(
-                                      onPressed: () {
-                                        context.read<ProductBloc>().add(
-                                          ProductFilterByExpireDate(!productState.showExpired),
-                                        );
-                                      },
-                                      icon: Icon(
-                                        Icons.calendar_today,
-                                        color: productState.showExpired 
-                                            ? themeState.primaryColor 
-                                            : themeState.secondaryTextColor,
-                                      ),
-                                      tooltip: 'Фильтр по сроку',
-                                    ),
-                                    // Toggle view mode
-                                    IconButton(
-                                      onPressed: () {
-                                        context.read<ProductBloc>().add(const ProductViewModeToggled());
-                                      },
-                                      icon: Icon(
-                                        productState.viewMode == ProductViewMode.grid
-                                            ? Icons.view_list
-                                            : Icons.grid_view,
-                                        color: themeState.secondaryTextColor,
-                                      ),
-                                      tooltip: productState.viewMode == ProductViewMode.grid
-                                          ? 'Список'
-                                          : 'Сетка',
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 15),
-                                
-                                // Products list/grid
-                                Expanded(
-                                  child: productState.isLoading
-                                      ? const Center(child: CircularProgressIndicator())
-                                      : productState.filteredProducts.isEmpty
-                                          ? Center(
-                                              child: Column(
-                                                mainAxisAlignment: MainAxisAlignment.center,
-                                                children: [
-                                                  Icon(
-                                                    Icons.shopping_bag_outlined,
-                                                    size: 80,
-                                                    color: themeState.secondaryTextColor,
-                                                  ),
-                                                  const SizedBox(height: 20),
-                                                  Text(
-                                                    'Продуктов пока нет',
-                                                    style: TextStyle(
-                                                      color: themeState.textColor,
-                                                      fontSize: 18,
-                                                      fontWeight: FontWeight.bold,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(height: 10),
-                                                  Text(
-                                                    'Нажмите + чтобы добавить',
-                                                    style: TextStyle(
-                                                      color: themeState.secondaryTextColor,
-                                                      fontSize: 14,
-                                                    ),
-                                                  ),
-                                                ],
-                                              ),
-                                            )
-                                          : GridView.builder(
-                                              padding: const EdgeInsets.all(8),
-                                              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                                                crossAxisCount: isDesktop ? 4 : 2,
-                                                crossAxisSpacing: 12,
-                                                mainAxisSpacing: 12,
-                                                childAspectRatio: isDesktop ? 0.85 : 1.0, // Desktop: калонтар (0.85), Mobile: чоркунча (1.0)
-                                              ),
-                                              itemCount: productState.filteredProducts.length,
-                                              itemBuilder: (context, index) {
-                                                final product = productState.filteredProducts[index];
-                                                return _buildProductCard(product, themeState, isDesktop);
-                                              },
-                                            ),
-                                ),
-                              ],
-                            );
-                          },
+                          onAddProduct: _showAddProductDialog,
+                          onEditProduct: _showEditProductDialog,
+                          onDeleteProduct: _showDeleteProductDialog,
                         ),
                       ),
                     ],

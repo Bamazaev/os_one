@@ -3,6 +3,7 @@ import 'product_event.dart';
 import 'product_state.dart';
 import '../../repositories/product_repository.dart';
 import '../../models/product_model.dart';
+import '../../services/hive_service.dart';
 
 class ProductBloc extends Bloc<ProductEvent, ProductState> {
   final ProductRepository productRepository;
@@ -15,6 +16,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     on<ProductDeleteRequested>(_onProductDeleteRequested);
     on<ProductViewModeToggled>(_onProductViewModeToggled);
     on<ProductFilterByExpireDate>(_onProductFilterByExpireDate);
+    on<ProductSearchRequested>(_onProductSearchRequested);
   }
 
   // Load all products
@@ -23,17 +25,35 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     Emitter<ProductState> emit,
   ) async {
     try {
-      emit(state.copyWith(isLoading: true));
       print('📦 Бор кардани продуктҳо...');
 
-      final products = await productRepository.getAllProducts();
+      // Check if this is a force refresh (from pull-to-refresh)
+      final isForceRefresh = event.forceRefresh ?? false;
+      
+      // Get products with cache info (force refresh if needed)
+      final result = isForceRefresh
+          ? await productRepository.getAllProductsWithCacheInfoForceRefresh()
+          : await productRepository.getAllProductsWithCacheInfo();
+      
+      // Only show loading if loading from network (not from cache)
+      if (!result.fromCache) {
+        emit(state.copyWith(isLoading: true));
+      }
       
       emit(state.copyWith(
-        products: products,
+        products: result.products,
         isLoading: false,
         error: null,
       ));
-      print('✅ ${products.length} продукт бор шуд');
+      
+      if (result.fromCache && !isForceRefresh) {
+        print('✅ ${result.products.length} продукт аз cache бор шуд (loading indicator намешавад)');
+      } else {
+        print('✅ ${result.products.length} продукт аз Google Sheets бор шуд${isForceRefresh ? " (force refresh)" : ""}');
+      }
+      
+      // Try to sync pending operations in background
+      _syncPendingOperations(emit);
     } catch (e) {
       print('❌ Хатои бор кардани продуктҳо: $e');
       emit(state.copyWith(
@@ -49,10 +69,52 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     Emitter<ProductState> emit,
   ) async {
     try {
-      emit(state.copyWith(isLoading: true));
+      // If we already have products loaded and just filtering, do it instantly
+      if (state.products.isNotEmpty && !state.isLoading) {
+        List<ProductModel> filteredProducts;
+        if (event.categoryId == 0) {
+          // Get all products from repository (might need to reload)
+          final result = await productRepository.getAllProductsWithCacheInfo();
+          filteredProducts = result.products;
+        } else {
+          // Fast filter from current state
+          filteredProducts = state.products.where((p) => p.categoryId == event.categoryId).toList();
+          
+          // If no products found in current state, reload from repository
+          if (filteredProducts.isEmpty) {
+            final result = await productRepository.getAllProductsWithCacheInfo();
+            filteredProducts = result.products.where((p) => p.categoryId == event.categoryId).toList();
+          }
+        }
+        
+        // Update state immediately (no loading indicator)
+        emit(state.copyWith(
+          products: filteredProducts,
+          selectedCategoryId: event.categoryId,
+          isLoading: false,
+          error: null,
+        ));
+        return;
+      }
+
+      // First time load or reload needed
       print('📦 Бор кардани продуктҳо барои категория ${event.categoryId}...');
 
-      final products = await productRepository.getProductsByCategory(event.categoryId);
+      // Get all products with cache info
+      final result = await productRepository.getAllProductsWithCacheInfo();
+      
+      // Filter by category (optimized - no debug logs in production)
+      List<ProductModel> products;
+      if (event.categoryId == 0) {
+        products = result.products;
+      } else {
+        products = result.products.where((p) => p.categoryId == event.categoryId).toList();
+      }
+      
+      // Only show loading if loading from network (not from cache)
+      if (!result.fromCache) {
+        emit(state.copyWith(isLoading: true));
+      }
       
       emit(state.copyWith(
         products: products,
@@ -60,7 +122,12 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
         isLoading: false,
         error: null,
       ));
-      print('✅ ${products.length} продукт бор шуд');
+      
+      if (result.fromCache) {
+        print('✅ ${products.length} продукт аз cache бор шуд');
+      } else {
+        print('✅ ${products.length} продукт аз Google Sheets бор шуд');
+      }
     } catch (e) {
       print('❌ Хатои бор кардани продуктҳо: $e');
       emit(state.copyWith(
@@ -76,28 +143,26 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     Emitter<ProductState> emit,
   ) async {
     try {
-      emit(state.copyWith(isLoading: true));
+      // Don't set isLoading to avoid global refresh indicator
       print('📝 Илова кардани продукт: ${event.product.name}');
 
-      // Save to Google Sheets
+      // Save to Google Sheets (or offline queue if no internet)
       final success = await productRepository.addProduct(event.product);
 
+      // Reload products (from cache if offline, from Google Sheets if online)
+      final updatedProducts = await productRepository.getAllProducts();
+      
+      emit(state.copyWith(
+        products: updatedProducts,
+        isLoading: false,
+        error: null,
+      ));
+      
       if (success) {
-        // Reload products
-        final updatedProducts = await productRepository.getAllProducts();
-        
-        emit(state.copyWith(
-          products: updatedProducts,
-          isLoading: false,
-          error: null,
-        ));
-        print('✅ Продукт "${event.product.name}" илова шуд');
+        print('✅ Продукт "${event.product.name}" илова шуд в Google Sheets');
       } else {
-        emit(state.copyWith(
-          isLoading: false,
-          error: 'Хатогӣ дар илова кардани продукт',
-        ));
-        print('❌ Продуктро илова карда натавонист');
+        print('📝 Продукт "${event.product.name}" сохранен офлайн (будет синхронизирован при появлении интернета)');
+        // Try to sync pending operations in background (no emit needed here, will be called on next load)
       }
     } catch (e) {
       print('❌ Хатои илова кардани продукт: $e');
@@ -114,7 +179,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     Emitter<ProductState> emit,
   ) async {
     try {
-      emit(state.copyWith(isLoading: true));
+      // Don't set isLoading to avoid global refresh indicator
       print('✏️ Навсозии продукт: ${event.name}');
 
       final existingProduct = state.products.firstWhere(
@@ -179,7 +244,7 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
     Emitter<ProductState> emit,
   ) async {
     try {
-      emit(state.copyWith(isLoading: true));
+      // Don't set isLoading to avoid global refresh indicator
       print('🗑️ Нест кардани продукт: ${event.id}');
 
       final success = await productRepository.deleteProduct(event.id);
@@ -230,6 +295,76 @@ class ProductBloc extends Bloc<ProductEvent, ProductState> {
   ) {
     emit(state.copyWith(showExpired: event.showExpired));
     print('📅 Show expired: ${event.showExpired}');
+  }
+
+  // Search products
+  void _onProductSearchRequested(
+    ProductSearchRequested event,
+    Emitter<ProductState> emit,
+  ) {
+    emit(state.copyWith(searchQuery: event.query));
+    print('🔍 Поиск: "${event.query}"');
+  }
+
+  // Sync pending operations from offline queue
+  Future<void> _syncPendingOperations(Emitter<ProductState> emit) async {
+    try {
+      final pendingOps = await HiveService.getPendingOperations();
+      final productOps = pendingOps.where((op) => 
+        op['type'] == 'add_product' || 
+        op['type'] == 'update_product' || 
+        op['type'] == 'delete_product'
+      ).toList();
+      
+      if (productOps.isEmpty) return;
+
+      print('🔄 Синхронизация ${productOps.length} операций продуктов из очереди...');
+      int syncedCount = 0;
+      final allOps = await HiveService.getPendingOperations();
+
+      for (var op in productOps) {
+        final type = op['type'] as String;
+        final data = Map<String, dynamic>.from(op['data'] as Map);
+
+        try {
+          bool success = false;
+          if (type == 'add_product') {
+            final product = ProductModel.fromMap(data);
+            success = await productRepository.addProduct(product);
+          } else if (type == 'update_product') {
+            final product = ProductModel.fromMap(data);
+            success = await productRepository.updateProduct(product);
+          } else if (type == 'delete_product') {
+            final id = data['id'] as int;
+            success = await productRepository.deleteProduct(id);
+          }
+
+          if (success) {
+            // Find and remove from queue
+            final index = allOps.indexWhere((o) => o['timestamp'] == op['timestamp']);
+            if (index >= 0) {
+              await HiveService.removePendingOperationByIndex(index);
+            }
+            syncedCount++;
+            print('✅ Синхронизирована операция: $type');
+          }
+        } catch (e) {
+          print('⚠️ Ошибка синхронизации операции $type: $e');
+        }
+      }
+
+      if (syncedCount > 0) {
+        print('✅ Синхронизировано $syncedCount операций продуктов');
+        // Refresh products after sync
+        final updatedProducts = await productRepository.getAllProducts();
+        emit(state.copyWith(
+          products: updatedProducts,
+          syncedCount: syncedCount, // Notify UI about sync
+        ));
+      }
+    } catch (e) {
+      print('❌ Ошибка синхронизации: $e');
+    }
   }
 }
 

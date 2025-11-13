@@ -6,12 +6,14 @@ class CategoryState extends Equatable {
   final int? selectedCategoryId;
   final bool isLoading;
   final String? error;
+  final int syncedCount; // Количество синхронизированных операций
 
   const CategoryState({
     this.categories = const [],
     this.selectedCategoryId,
     this.isLoading = false,
     this.error,
+    this.syncedCount = 0,
   });
 
   // Initial state
@@ -23,6 +25,7 @@ class CategoryState extends Equatable {
     int? selectedCategoryId,
     bool? isLoading,
     String? error,
+    int? syncedCount,
     bool clearSelectedCategory = false,
   }) {
     return CategoryState(
@@ -30,6 +33,7 @@ class CategoryState extends Equatable {
       selectedCategoryId: clearSelectedCategory ? null : (selectedCategoryId ?? this.selectedCategoryId),
       isLoading: isLoading ?? this.isLoading,
       error: error,
+      syncedCount: syncedCount ?? this.syncedCount,
     );
   }
 
@@ -44,6 +48,6 @@ class CategoryState extends Equatable {
   }
 
   @override
-  List<Object?> get props => [categories, selectedCategoryId, isLoading, error];
+  List<Object?> get props => [categories, selectedCategoryId, isLoading, error, syncedCount];
 }
 
