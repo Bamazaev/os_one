@@ -55,7 +55,26 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       );
       emit(state.copyWithUser(user));
     } catch (e) {
-      emit(state.copyWithError(e.toString().replaceAll('Exception: ', '')));
+      String errorMessage = e.toString();
+      // Тозакунии хабар аз префикси техникӣ
+      errorMessage = errorMessage.replaceAll('Exception: ', '');
+      
+      // Хатогӣҳои Google Sheets
+      if (errorMessage.contains('50000') || 
+          errorMessage.contains('maximum') ||
+          errorMessage.contains('GSheets')) {
+        errorMessage = 'Фото ё фон хеле калон аст. Лутфан фотои хурдтарро интихоб кунед.';
+      }
+      // Хатогӣҳои пайвастшавӣ
+      else if (errorMessage.contains('ClientException') || 
+          errorMessage.contains('SocketException') ||
+          errorMessage.contains('HttpException') ||
+          errorMessage.contains('Connection refused') ||
+          errorMessage.contains('Failed host lookup')) {
+        errorMessage = 'Хатогӣ дар пайваст ба сервер. Лутфан пайвасти интернетро санҷед.';
+      }
+      
+      emit(state.copyWithError(errorMessage));
     }
   }
 
@@ -72,7 +91,21 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
       );
       emit(state.copyWithUser(user));
     } catch (e) {
-      emit(state.copyWithError(e.toString().replaceAll('Exception: ', '')));
+      String errorMessage = e.toString();
+      // Тозакунии хабар аз префикси техникӣ
+      errorMessage = errorMessage.replaceAll('Exception: ', '');
+      
+      // Агар хабар аллакай аз auth_repository омадааст, онро истифода мебарем
+      // Танҳо хатоҳои техникии норавшанро ивазкунӣ мекунем
+      if (errorMessage.contains('ClientException') || 
+          errorMessage.contains('SocketException') ||
+          errorMessage.contains('HttpException') ||
+          errorMessage.contains('Connection refused') ||
+          errorMessage.contains('Failed host lookup')) {
+        errorMessage = 'Хатогӣ дар пайваст ба сервер. Лутфан пайвасти интернетро санҷед.';
+      }
+      
+      emit(state.copyWithError(errorMessage));
     }
   }
 

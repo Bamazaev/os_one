@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import '../utils/base64_helper.dart';
 
 class ProductModel extends Equatable {
   final int id;
@@ -64,12 +65,18 @@ class ProductModel extends Equatable {
       productId = productId % 2147483647;
     }
     
+    // Очищаем base64 от префикса data URI если он есть
+    final rawImage = map['image']?.toString();
+    final cleanImage = rawImage != null && rawImage.isNotEmpty 
+        ? cleanBase64String(rawImage) 
+        : null;
+    
     return ProductModel(
       id: productId,
       barcode: (map['barcode']?.toString() ?? '').trim(),
       categoryId: categoryId,
       name: (map['name']?.toString() ?? '').trim(),
-      imageBase64: map['image']?.toString(),
+      imageBase64: cleanImage,
       description: map['description']?.toString() != null ? map['description'].toString().trim() : null,
       stock: double.tryParse(map['stock']?.toString() ?? '0') ?? 0,
       stockSold: double.tryParse(map['stock_furuhtashud']?.toString() ?? '0') ?? 0,
@@ -79,8 +86,38 @@ class ProductModel extends Equatable {
       position: int.tryParse(map['position']?.toString() ?? '0') ?? 0,
       expireAt: map['expireAt']?.toString() != null ? map['expireAt'].toString().trim() : null,
       piece: double.tryParse(map['piece']?.toString() ?? ''),
-      unit: map['unit']?.toString() != null ? map['unit'].toString().trim() : null,
+      unit: _normalizeUnit(map['unit']?.toString()),
     );
+  }
+
+  // Нормализация единиц измерения - всегда в нижнем регистре
+  static String? _normalizeUnit(String? unit) {
+    if (unit == null || unit.trim().isEmpty) {
+      return null;
+    }
+    
+    final trimmed = unit.trim();
+    final normalized = trimmed.toUpperCase();
+    
+    // Нормализация различных вариантов к нижнему регистру
+    if (normalized == 'KG' || normalized == 'КГ' || normalized == 'КИЛОГРАММ') {
+      return 'кг';
+    } else if (normalized == 'L' || normalized == 'Л' || normalized == 'ЛИТР' || normalized == 'LITRE' || normalized == 'LITER') {
+      return 'л';
+    } else if (normalized == 'M' || normalized == 'М' || normalized == 'МЕТР' || normalized == 'METER' || normalized == 'METRE') {
+      return 'м';
+    } else if (normalized == 'PCS' || normalized == 'PCE' || normalized == 'ШТ' || normalized == 'ШТУКА' || normalized == 'PIECE' || normalized == 'PCS.') {
+      return 'шт';
+    }
+    
+    // Если единица уже в правильном формате (кг, л, м, шт), возвращаем в нижнем регистре
+    final lower = trimmed.toLowerCase();
+    if (lower == 'кг' || lower == 'л' || lower == 'м' || lower == 'шт') {
+      return lower;
+    }
+    
+    // Если не распознано, возвращаем в нижнем регистре как есть
+    return lower;
   }
 
   // To Map (Google Sheets)

@@ -252,14 +252,23 @@ class _SplashViewState extends State<SplashView> with TickerProviderStateMixin {
                                             ),
                                           ],
                                         ),
-                                        child: SvgPicture.asset(
-                                          'assets/logo/logo_white no back.svg',
+                                        child: Image.asset(
+                                          'assets/logo/logo.png',
                                           width: logoSize,
                                           height: logoSize,
-                                          colorFilter: const ColorFilter.mode(
-                                            Colors.white,
-                                            BlendMode.srcIn,
-                                          ),
+                                          fit: BoxFit.contain,
+                                          errorBuilder: (context, error, stackTrace) {
+                                            // Fallback to SVG if PNG not found
+                                            return SvgPicture.asset(
+                                              'assets/logo/logo_white no back.svg',
+                                              width: logoSize,
+                                              height: logoSize,
+                                              colorFilter: const ColorFilter.mode(
+                                                Colors.white,
+                                                BlendMode.srcIn,
+                                              ),
+                                            );
+                                          },
                                         ),
                                       ),
                                     ),

@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'dart:convert';
 import '../../auth/bloc/auth_bloc.dart';
 import '../../auth/bloc/auth_event.dart';
 import '../../auth/bloc/auth_state.dart';
 import '../../bloc/theme/theme_bloc.dart';
 import '../../bloc/theme/theme_event.dart';
 import '../../bloc/theme/theme_state.dart';
+import '../../utils/base64_helper.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
@@ -122,7 +122,10 @@ class ProfileScreen extends StatelessWidget {
               backgroundColor: themeState.surfaceColor,
               backgroundImage: authState.user!.photoUrl != null &&
                       authState.user!.photoUrl!.isNotEmpty
-                  ? MemoryImage(base64Decode(authState.user!.photoUrl!))
+                  ? (() {
+                      final bytes = safeBase64Decode(authState.user!.photoUrl!);
+                      return bytes != null ? MemoryImage(bytes) : null;
+                    })()
                   : null,
               child: authState.user!.photoUrl == null || authState.user!.photoUrl!.isEmpty
                   ? Icon(Icons.person, size: avatarSize, color: themeState.secondaryTextColor)

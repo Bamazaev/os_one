@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../../../utils/base64_helper.dart';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
@@ -17,7 +18,7 @@ class EditCategoryDialog {
     final nameController = TextEditingController(text: category.name);
     String? selectedImageBase64 = category.imageBase64;
     Uint8List? imageBytes = category.imageBase64 != null 
-        ? base64Decode(category.imageBase64!) 
+        ? safeBase64Decode(category.imageBase64!) 
         : null;
 
     return showDialog(

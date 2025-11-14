@@ -1,4 +1,5 @@
 import 'package:equatable/equatable.dart';
+import '../utils/base64_helper.dart';
 
 class CategoryModel extends Equatable {
   final int id;
@@ -17,10 +18,16 @@ class CategoryModel extends Equatable {
 
   // Factory from Google Sheets Map
   factory CategoryModel.fromMap(Map<String, dynamic> map) {
+    // Очищаем base64 от префикса data URI если он есть
+    final rawImage = map['image']?.toString();
+    final cleanImage = rawImage != null && rawImage.isNotEmpty 
+        ? cleanBase64String(rawImage) 
+        : null;
+    
     return CategoryModel(
       id: int.tryParse(map['id']?.toString() ?? '0') ?? 0,
       name: map['name']?.toString() ?? '',
-      imageBase64: map['image']?.toString(),
+      imageBase64: cleanImage,
       productCount: int.tryParse(map['productCount']?.toString() ?? '0') ?? 0,
       position: int.tryParse(map['position']?.toString() ?? '0') ?? 0,
     );

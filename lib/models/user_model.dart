@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import 'package:hive/hive.dart';
+import '../utils/base64_helper.dart';
 
 part 'user_model.g.dart';
 
@@ -43,6 +44,17 @@ class UserModel extends Equatable {
   String get fullName => '$name $lastName';
 
   factory UserModel.fromMap(Map<String, dynamic> map) {
+    // Очищаем base64 от префикса data URI если он есть
+    final rawPhotoUrl = map['photoUrl']?.toString();
+    final cleanPhotoUrl = rawPhotoUrl != null && rawPhotoUrl.isNotEmpty 
+        ? cleanBase64String(rawPhotoUrl) 
+        : null;
+    
+    final rawHeaderUrl = map['headerUrl']?.toString();
+    final cleanHeaderUrl = rawHeaderUrl != null && rawHeaderUrl.isNotEmpty 
+        ? cleanBase64String(rawHeaderUrl) 
+        : null;
+    
     return UserModel(
       id: map['id']?.toString() ?? '',
       name: map['name']?.toString() ?? '',
@@ -50,8 +62,8 @@ class UserModel extends Equatable {
       email: map['email']?.toString() ?? '',
       phone: map['phone']?.toString() ?? '',
       role: map['role']?.toString() ?? 'user',
-      photoUrl: map['photoUrl']?.toString(),
-      headerUrl: map['headerUrl']?.toString(),
+      photoUrl: cleanPhotoUrl,
+      headerUrl: cleanHeaderUrl,
     );
   }
 

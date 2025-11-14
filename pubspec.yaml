@@ -42,7 +42,7 @@ dependencies:
   gsheets: ^0.5.0
   shared_preferences: ^2.2.2
   image_picker: ^1.0.7
-  file_picker: ^6.1.1
+  file_picker: ^8.1.2
   image: ^4.1.7
   hive: ^2.2.3
   hive_flutter: ^1.1.0
@@ -110,20 +110,21 @@ flutter:
 flutter_launcher_icons:
   android: true
   ios: true
-  image_path: "assets/logo/logo 1.png"
+  image_path: "assets/logo/logo.png"
+  # Барои Android adaptive icon - логотип дар марказ
+  # Логотип бояд дар маркази canvas-и 1024x1024 бошад
   adaptive_icon_background: "#10b981"
-  adaptive_icon_foreground: "assets/logo/logo 1.png"
+  adaptive_icon_foreground: "assets/logo/logo.png"
+  remove_alpha_ios: true
   min_sdk_android: 21
-  icon_size: 48
   web:
     generate: true
-    image_path: "assets/logo/logo 1.png"
+    image_path: "assets/logo/logo.png"
     background_color: "#10b981"
     theme_color: "#10b981"
   windows:
     generate: true
-    image_path: "assets/logo/logo 1.png"
-    icon_size: 48
+    image_path: "assets/logo/logo.png"
   macos:
     generate: true
-    image_path: "assets/logo/logo 1.png"
+    image_path: "assets/logo/logo.png"

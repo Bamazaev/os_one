@@ -11,12 +11,14 @@ class HiveService {
   static const String _categoryBoxName = 'categories';
   static const String _productBoxName = 'products';
   static const String _pendingOpsBoxName = 'pending_operations';
+  static const String _userPasswordsBoxName = 'user_passwords';
   
   static Box<UserModel>? _userBox;
   static Box? _settingsBox;
   static Box? _categoryBox;
   static Box? _productBox;
   static Box? _pendingOpsBox;
+  static Box? _userPasswordsBox;
 
   /// Инициализатсияи Hive
   static Future<void> init() async {
@@ -48,6 +50,7 @@ class HiveService {
       _categoryBox = await Hive.openBox(_categoryBoxName);
       _productBox = await Hive.openBox(_productBoxName);
       _pendingOpsBox = await Hive.openBox(_pendingOpsBoxName);
+      _userPasswordsBox = await Hive.openBox(_userPasswordsBoxName);
       print('✅ Hive boxes кушода шуданд');
       print('📦 Users box дорад ${_userBox!.length} корбар');
       print('📦 Categories box дорад ${_categoryBox!.length} категория');
@@ -173,10 +176,65 @@ class HiveService {
   /// Ҷустуҷӯи корбар аз phone
   static UserModel? findUserByPhone(String phone) {
     final users = getAllUsers();
+    
+    // Normalize кардани телефони ҷустуҷӯӣ (пок кардани +, боскаҳо, ва ғ.)
+    final normalizedPhone = _normalizePhone(phone);
+    print('🔍 Ҷустуҷӯи корбар бо телефон: $phone (normalized: $normalizedPhone)');
+    print('📦 Ҳамагӣ ${users.length} корбар дар Hive');
+    
     try {
-      return users.firstWhere((user) => user.phone == phone);
-    } catch (e) {
+      // Санҷиш бо normalize кардани ҳарду телефон
+      for (var user in users) {
+        final userNormalizedPhone = _normalizePhone(user.phone);
+        print('  - Санҷиш: ${user.phone} (normalized: $userNormalizedPhone) -> ${user.name}');
+        if (userNormalizedPhone == normalizedPhone) {
+          print('✅ Корбар ёфт шуд: ${user.name} (${user.phone})');
+          return user;
+        }
+      }
+      print('❌ Корбар бо телефони $phone ёфт нашуд');
       return null;
+    } catch (e) {
+      print('❌ Хатогӣ дар findUserByPhone: $e');
+      return null;
+    }
+  }
+  
+  /// Normalize кардани телефон (пок кардани +, боскаҳо, тире ва ғ.)
+  static String _normalizePhone(String phone) {
+    return phone.replaceAll(RegExp(r'[\s\-\(\)\+]'), '');
+  }
+
+  /// Захира кардани пароли корбар (барои офлайн-логин)
+  static Future<void> saveUserPassword(String userId, String password) async {
+    try {
+      final box = _userPasswordsBox ?? Hive.box(_userPasswordsBoxName);
+      await box.put(userId, password);
+      print('🔐 Пароли корбар захира шуд: $userId');
+    } catch (e) {
+      print('❌ Хатогӣ дар saveUserPassword: $e');
+    }
+  }
+
+  /// Гирифтани пароли корбар (барои офлайн-логин)
+  static String? getUserPassword(String userId) {
+    try {
+      final box = _userPasswordsBox ?? Hive.box(_userPasswordsBoxName);
+      return box.get(userId)?.toString();
+    } catch (e) {
+      print('❌ Хатогӣ дар getUserPassword: $e');
+      return null;
+    }
+  }
+
+  /// Пок кардани пароли корбар (при logout)
+  static Future<void> clearUserPassword(String userId) async {
+    try {
+      final box = _userPasswordsBox ?? Hive.box(_userPasswordsBoxName);
+      await box.delete(userId);
+      print('🗑️ Пароли корбар пок шуд: $userId');
+    } catch (e) {
+      print('❌ Хатогӣ дар clearUserPassword: $e');
     }
   }
 

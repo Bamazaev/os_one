@@ -1,4 +1,5 @@
 import 'dart:convert';
+import '../../utils/base64_helper.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
@@ -79,7 +80,7 @@ class _HomePageState extends State<HomePage> {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(14),
                   child: Image.memory(
-                    base64Decode(category.imageBase64!),
+                    safeBase64Decode(category.imageBase64!) ?? Uint8List(0),
                     width: size,
                     height: size,
                     fit: BoxFit.cover,
@@ -724,7 +725,7 @@ class _HomePageState extends State<HomePage> {
     final nameController = TextEditingController(text: category.name);
     String? selectedImageBase64 = category.imageBase64;
     Uint8List? imageBytes = category.imageBase64 != null 
-        ? base64Decode(category.imageBase64!) 
+        ? safeBase64Decode(category.imageBase64!) 
         : null;
 
     showDialog(
@@ -1120,7 +1121,7 @@ class _HomePageState extends State<HomePage> {
                 RepaintBoundary(
                   child: product.imageBase64 != null && product.imageBase64!.isNotEmpty
                       ? Image.memory(
-                          base64Decode(product.imageBase64!),
+                          safeBase64Decode(product.imageBase64!) ?? Uint8List(0),
                           width: double.infinity,
                           height: double.infinity,
                           fit: BoxFit.cover,
@@ -1312,8 +1313,8 @@ class _HomePageState extends State<HomePage> {
                                 ),
                                 child: Text(
                                   (product.unit != null && product.unit!.isNotEmpty) 
-                                      ? product.unit! 
-                                      : 'КГ',
+                                      ? product.unit!.toLowerCase() 
+                                      : 'кг',
                                   style: TextStyle(
                                     color: Colors.white,
                                     fontSize: isDesktop ? 14 : 11,
@@ -1425,15 +1426,15 @@ class _HomePageState extends State<HomePage> {
     Uint8List? selectedImageBytes;
     int? selectedCategoryId;
     DateTime? selectedExpireDate;
-    String? selectedUnit;
+    String selectedUnit = 'шт'; // Значение по умолчанию (не nullable)
     bool isFavorite = false;
     
     // Unit options
     final List<Map<String, String>> unitOptions = [
-      {'value': 'КГ', 'label': 'КГ (килограмм)'},
-      {'value': 'Л', 'label': 'Л (литр)'},
-      {'value': 'М', 'label': 'М (метр)'},
-      {'value': 'ШТ', 'label': 'ШТ (штука)'},
+      {'value': 'кг', 'label': 'кг (килограмм)'},
+      {'value': 'л', 'label': 'л (литр)'},
+      {'value': 'м', 'label': 'м (метр)'},
+      {'value': 'шт', 'label': 'шт (штука)'},
     ];
 
     await showDialog(
@@ -1660,14 +1661,8 @@ class _HomePageState extends State<HomePage> {
                                 ),
                                 child: DropdownButtonHideUnderline(
                                   child: DropdownButton<String>(
-                                    value: selectedUnit != null && unitOptions.any((u) => u['value'] == selectedUnit)
-                                        ? selectedUnit
-                                        : null, // Set to null if value doesn't exist in items
+                                    value: selectedUnit, // Всегда имеет значение "ШТ" по умолчанию
                                     isExpanded: true,
-                                    hint: Text(
-                                      'Выберите',
-                                      style: TextStyle(color: themeState.secondaryTextColor),
-                                    ),
                                     dropdownColor: themeState.surfaceColor,
                                     style: TextStyle(color: themeState.textColor),
                                     items: unitOptions.map((unit) {
@@ -1678,9 +1673,11 @@ class _HomePageState extends State<HomePage> {
                                       );
                                     }).toList(),
                                     onChanged: (value) {
-                                      setState(() {
-                                        selectedUnit = value;
-                                      });
+                                      if (value != null) {
+                                        setState(() {
+                                          selectedUnit = value;
+                                        });
+                                      }
                                     },
                                   ),
                                 ),
@@ -1840,7 +1837,7 @@ class _HomePageState extends State<HomePage> {
                     isFavorite: isFavorite,
                     position: position,
                     expireAt: selectedExpireDate?.toIso8601String(),
-                    unit: selectedUnit,
+                    unit: selectedUnit.toLowerCase(), // Всегда в нижнем регистре
                   );
 
                   // Close dialog first
@@ -1908,7 +1905,7 @@ class _HomePageState extends State<HomePage> {
     
     String? selectedImageBase64 = product.imageBase64;
     Uint8List? selectedImageBytes = product.imageBase64 != null 
-        ? base64Decode(product.imageBase64!) 
+        ? safeBase64Decode(product.imageBase64!) 
         : null;
     int? selectedCategoryId = product.categoryId;
     DateTime? selectedExpireDate = product.expireAt != null 
@@ -1916,39 +1913,40 @@ class _HomePageState extends State<HomePage> {
         : null;
     // Unit options
     final List<Map<String, String>> unitOptions = [
-      {'value': 'КГ', 'label': 'КГ (килограмм)'},
-      {'value': 'Л', 'label': 'Л (литр)'},
-      {'value': 'М', 'label': 'М (метр)'},
-      {'value': 'ШТ', 'label': 'ШТ (штука)'},
+      {'value': 'кг', 'label': 'кг (килограмм)'},
+      {'value': 'л', 'label': 'л (литр)'},
+      {'value': 'м', 'label': 'м (метр)'},
+      {'value': 'шт', 'label': 'шт (штука)'},
     ];
     
     // Normalize unit value - check if it exists in options, otherwise set to null
-    String? selectedUnit = product.unit;
+    // Always convert to lowercase for consistency
+    String? selectedUnit = product.unit?.toLowerCase().trim();
     if (selectedUnit != null && selectedUnit.isNotEmpty) {
       final validUnits = unitOptions.map((u) => u['value']!).whereType<String>().toList();
       // Check if value exists in valid units (case-insensitive)
       final existsInValid = validUnits.any((u) => u.toLowerCase() == selectedUnit!.toLowerCase());
       
       if (!existsInValid) {
-        // Try to normalize common variations (case-insensitive)
+        // Try to normalize common variations (case-insensitive) - convert to lowercase
         final normalized = selectedUnit.trim().toUpperCase();
         if (normalized == 'KG' || normalized == 'КГ' || normalized == 'КИЛОГРАММ') {
-          selectedUnit = 'КГ';
+          selectedUnit = 'кг';
         } else if (normalized == 'L' || normalized == 'Л' || normalized == 'ЛИТР' || normalized == 'LITRE' || normalized == 'LITER') {
-          selectedUnit = 'Л';
+          selectedUnit = 'л';
         } else if (normalized == 'M' || normalized == 'М' || normalized == 'МЕТР' || normalized == 'METER' || normalized == 'METRE') {
-          selectedUnit = 'М';
+          selectedUnit = 'м';
         } else if (normalized == 'PCS' || normalized == 'PCE' || normalized == 'ШТ' || normalized == 'ШТУКА' || normalized == 'PIECE' || normalized == 'PCS.') {
-          selectedUnit = 'ШТ';
+          selectedUnit = 'шт';
         } else {
           // If not found, set to null to avoid DropdownButton error
           selectedUnit = null;
         }
       } else {
-        // Value exists but might be in different case - use the correct one from validUnits
+        // Value exists but might be in different case - use the correct one from validUnits (lowercase)
         selectedUnit = validUnits.firstWhere(
           (u) => u.toLowerCase() == selectedUnit!.toLowerCase(),
-          orElse: () => 'КГ', // Default fallback
+          orElse: () => 'кг', // Default fallback
         );
       }
     }
@@ -2179,14 +2177,8 @@ class _HomePageState extends State<HomePage> {
                                 ),
                                 child: DropdownButtonHideUnderline(
                                   child: DropdownButton<String>(
-                                    value: selectedUnit != null && unitOptions.any((u) => u['value'] == selectedUnit)
-                                        ? selectedUnit
-                                        : null, // Set to null if value doesn't exist in items
+                                    value: selectedUnit, // Всегда имеет значение "ШТ" по умолчанию
                                     isExpanded: true,
-                                    hint: Text(
-                                      'Выберите',
-                                      style: TextStyle(color: themeState.secondaryTextColor),
-                                    ),
                                     dropdownColor: themeState.surfaceColor,
                                     style: TextStyle(color: themeState.textColor),
                                     items: unitOptions.map((unit) {
@@ -2197,9 +2189,11 @@ class _HomePageState extends State<HomePage> {
                                       );
                                     }).toList(),
                                     onChanged: (value) {
-                                      setState(() {
-                                        selectedUnit = value;
-                                      });
+                                      if (value != null) {
+                                        setState(() {
+                                          selectedUnit = value;
+                                        });
+                                      }
                                     },
                                   ),
                                 ),
@@ -2380,7 +2374,7 @@ class _HomePageState extends State<HomePage> {
                       purchasePrice: double.tryParse(purchasePriceController.text) ?? 0.0,
                       salePrice: double.tryParse(salePriceController.text) ?? 0.0,
                       expireAt: selectedExpireDate?.toIso8601String(),
-                      unit: selectedUnit,
+                      unit: selectedUnit?.toLowerCase(),
                     ),
                   );
                 },

@@ -3,6 +3,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../auth/bloc/auth_bloc.dart';
 import '../../auth/bloc/auth_event.dart';
 import '../../auth/bloc/auth_state.dart';
+import '../../bloc/theme/theme_bloc.dart';
+import '../../bloc/theme/theme_event.dart';
+import '../../bloc/theme/theme_state.dart';
 import 'register_screen.dart';
 import '../home/home_screen.dart';
 
@@ -69,23 +72,64 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Container(
-        width: double.infinity,
-        height: double.infinity,
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF0a4d3c),
-              Color(0xFF0d6e58),
-              Color(0xFF10b981),
-            ],
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
+    return BlocBuilder<ThemeBloc, ThemeState>(
+      builder: (context, themeState) {
+        return Scaffold(
+          backgroundColor: themeState.isDarkMode ? null : Colors.white,
+          body: Container(
+            width: double.infinity,
+            height: double.infinity,
+            decoration: themeState.isDarkMode
+                ? BoxDecoration(
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Color(0xFF0a4d3c),
+                        Color(0xFF0d6e58),
+                        Color(0xFF10b981),
+                      ],
+                    ),
+                  )
+                : const BoxDecoration(
+                    color: Colors.white,
+                  ),
+            child: SafeArea(
+              child: Stack(
+                children: [
+                  // Кнопка переключения темы
+                  Positioned(
+                    top: 10,
+                    right: 10,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: themeState.isDarkMode
+                            ? Colors.white.withOpacity(0.2)
+                            : Colors.grey[200],
+                        borderRadius: BorderRadius.circular(30),
+                        border: Border.all(
+                          color: themeState.isDarkMode
+                              ? Colors.white.withOpacity(0.3)
+                              : Colors.grey[300]!,
+                          width: 1,
+                        ),
+                      ),
+                      child: IconButton(
+                        icon: Icon(
+                          themeState.isDarkMode ? Icons.light_mode : Icons.dark_mode,
+                          color: themeState.isDarkMode
+                              ? Colors.white
+                              : Colors.grey[700],
+                        ),
+                        onPressed: () {
+                          context.read<ThemeBloc>().add(const ThemeToggled());
+                        },
+                        tooltip: themeState.isDarkMode ? 'Светлая тема' : 'Темная тема',
+                      ),
+                    ),
+                  ),
+                  // Основной контент
+                  Center(
             child: SingleChildScrollView(
               child: FadeTransition(
                 opacity: _fadeAnimation,
@@ -96,21 +140,28 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                     padding: const EdgeInsets.all(30),
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(30),
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.white.withOpacity(0.15),
-                          Colors.white.withOpacity(0.08),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+                      color: themeState.isDarkMode ? null : Colors.white,
+                      gradient: themeState.isDarkMode
+                          ? LinearGradient(
+                              colors: [
+                                Colors.white.withOpacity(0.15),
+                                Colors.white.withOpacity(0.08),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            )
+                          : null,
                       border: Border.all(
-                        color: Colors.white.withOpacity(0.3),
+                        color: themeState.isDarkMode
+                            ? Colors.white.withOpacity(0.3)
+                            : const Color(0xFF10b981).withOpacity(0.3),
                         width: 1.5,
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.3),
+                          color: themeState.isDarkMode
+                              ? Colors.black.withOpacity(0.3)
+                              : Colors.grey.withOpacity(0.2),
                           blurRadius: 30,
                           offset: const Offset(0, 15),
                         ),
@@ -161,19 +212,23 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                       ),
                                     ],
                                   ),
-                                  child: const Icon(
+                                  child: Icon(
                                     Icons.person_outline,
                                     size: 60,
-                                    color: Colors.white,
+                                    color: themeState.isDarkMode
+                                        ? Colors.white
+                                        : const Color(0xFF10b981),
                                   ),
                                 ),
                                 const SizedBox(height: 30),
 
                                 // Заголовок
-                                const Text(
+                                Text(
                                   'ВХОД',
                                   style: TextStyle(
-                                    color: Colors.white,
+                                    color: themeState.isDarkMode
+                                        ? Colors.white
+                                        : const Color(0xFF10b981),
                                     fontWeight: FontWeight.w900,
                                     fontSize: 36,
                                     letterSpacing: 2,
@@ -183,7 +238,9 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                 Text(
                                   'Войдите в свой аккаунт',
                                   style: TextStyle(
-                                    color: Colors.white.withOpacity(0.8),
+                                    color: themeState.isDarkMode
+                                        ? Colors.white.withOpacity(0.8)
+                                        : Colors.grey[700],
                                     fontSize: 16,
                                   ),
                                 ),
@@ -206,10 +263,12 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                   hint: 'Пароль',
                                   icon: Icons.lock_outline,
                                   obscureText: _obscure,
-                                  suffixIcon: IconButton(
+                                    suffixIcon: IconButton(
                                     icon: Icon(
                                       _obscure ? Icons.visibility_off : Icons.visibility,
-                                      color: Colors.white,
+                                      color: themeState.isDarkMode
+                                          ? Colors.white
+                                          : Colors.grey[700],
                                     ),
                                     onPressed: () => setState(() => _obscure = !_obscure),
                                   ),
@@ -278,7 +337,11 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
                                   children: [
                                     Text(
                                       'Нет аккаунта? ',
-                                      style: TextStyle(color: Colors.white.withOpacity(0.8)),
+                                      style: TextStyle(
+                                        color: themeState.isDarkMode
+                                            ? Colors.white.withOpacity(0.8)
+                                            : Colors.grey[700],
+                                      ),
                                     ),
                                     GestureDetector(
                                       onTap: () {
@@ -310,8 +373,12 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
               ),
             ),
           ),
-        ),
-      ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -324,25 +391,42 @@ class _LoginScreenState extends State<LoginScreen> with TickerProviderStateMixin
     TextInputType? keyboardType,
     String? Function(String?)? validator,
   }) {
+    final themeState = context.watch<ThemeBloc>().state;
+    final isDark = themeState.isDarkMode;
+    
     return TextFormField(
       controller: controller,
       obscureText: obscureText,
       keyboardType: keyboardType,
-      style: const TextStyle(color: Colors.white),
+      style: TextStyle(color: isDark ? Colors.white : Colors.black87),
       decoration: InputDecoration(
         hintText: hint,
-        hintStyle: TextStyle(color: Colors.white.withOpacity(0.5)),
+        hintStyle: TextStyle(
+          color: isDark
+              ? Colors.white.withOpacity(0.5)
+              : Colors.grey[600],
+        ),
         prefixIcon: Icon(icon, color: const Color(0xFF34d399)),
         suffixIcon: suffixIcon,
         filled: true,
-        fillColor: Colors.white.withOpacity(0.1),
+        fillColor: isDark
+            ? Colors.white.withOpacity(0.1)
+            : Colors.grey[100],
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(15),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.3)),
+          borderSide: BorderSide(
+            color: isDark
+                ? Colors.white.withOpacity(0.3)
+                : Colors.grey[300]!,
+          ),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(15),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.3)),
+          borderSide: BorderSide(
+            color: isDark
+                ? Colors.white.withOpacity(0.3)
+                : Colors.grey[300]!,
+          ),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(15),

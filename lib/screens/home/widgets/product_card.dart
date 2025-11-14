@@ -1,4 +1,5 @@
-import 'dart:convert';
+import 'dart:typed_data';
+import '../../../utils/base64_helper.dart';
 import 'package:flutter/material.dart';
 import '../../../models/product_model.dart';
 import '../../../bloc/theme/theme_state.dart';
@@ -48,7 +49,7 @@ class ProductCard extends StatelessWidget {
               RepaintBoundary(
                 child: product.imageBase64 != null && product.imageBase64!.isNotEmpty
                     ? Image.memory(
-                        base64Decode(product.imageBase64!),
+                        safeBase64Decode(product.imageBase64!) ?? Uint8List(0),
                         width: double.infinity,
                         height: double.infinity,
                         fit: BoxFit.cover,
@@ -215,8 +216,8 @@ class ProductCard extends StatelessWidget {
                               ),
                               child: Text(
                                 (product.unit != null && product.unit!.isNotEmpty) 
-                                    ? product.unit! 
-                                    : 'КГ',
+                                    ? product.unit!.toLowerCase() 
+                                    : 'кг',
                                 style: TextStyle(
                                   color: Colors.white,
                                   fontSize: isDesktop ? 14 : 11,

@@ -1,4 +1,5 @@
-import 'dart:convert';
+import 'dart:typed_data';
+import '../../../utils/base64_helper.dart';
 import 'package:flutter/material.dart';
 import '../../../models/category_model.dart';
 import '../../../bloc/theme/theme_state.dart';
@@ -65,7 +66,7 @@ class CategoryCard extends StatelessWidget {
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(14),
                   child: Image.memory(
-                    base64Decode(category.imageBase64!),
+                    safeBase64Decode(category.imageBase64!) ?? Uint8List(0),
                     width: size,
                     height: size,
                     fit: BoxFit.cover,
@@ -136,6 +137,7 @@ class CategoryCard extends StatelessWidget {
                         color: Colors.black,
                         offset: Offset(0, 1),
                         blurRadius: 3,
+                      
                       ),
                     ],
                   ),
@@ -155,8 +157,8 @@ class CategoryCard extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                     decoration: BoxDecoration(
                       color: category.productCount > 0 
-                          ? Colors.green.withOpacity(0.9)
-                          : Colors.grey.withOpacity(0.7),
+                          ? themeState.primaryColor.withOpacity(0.8)
+                          : themeState.secondaryTextColor.withOpacity(0.7),
                       borderRadius: BorderRadius.only(
                         bottomLeft: Radius.circular(12),
                         topRight: Radius.circular(12),
